@@ -19,9 +19,10 @@
 #include <errno.h>
 
 
-char *picture_name = "pic_capture_test%d.jpg";
-char *video_name = "video_capture_test.jpg";
+char *picture_name = "pic_capture_test%d.yuv";
+char *video_name = "video_capture_test.yuv";
 char *device_path = "/dev/video2";
+FILE *video_fp;
 
 typedef struct {
     void *start;
@@ -36,6 +37,13 @@ int open_camera() {
     int fd = open(device_path, O_RDWR);
     if (fd < 0) {
         fprintf(stderr, "%s open err \n", device_path);
+        exit(EXIT_FAILURE);
+    }
+
+
+    if((video_fp = fopen(video_name, "a")) == NULL)
+    {
+        fprintf(stderr, "%s open err \n", video_name);
         exit(EXIT_FAILURE);
     }
 
@@ -128,13 +136,24 @@ int init_camera(int fd) {
     fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;      /*v4l2_buf_typea,camera must use V4L2_BUF_TYPE_VIDEO_CAPTURE*/
     fmt.fmt.pix.width = 640;
     fmt.fmt.pix.height = 480;
-    fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_JPEG;	/*V4L2_PIX_FMT_YYUV*/
+    fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;	/*V4L2_PIX_FMT_YYUV*/
     fmt.fmt.pix.field = V4L2_FIELD_NONE;   		/*V4L2_FIELD_NONE*/
     if (ioctl(fd, VIDIOC_S_FMT, &fmt)< 0)
     {
         fprintf(stderr,"VIDIOC_S_FMT set err\n");
         exit(EXIT_FAILURE);
     }
+
+    if (ioctl(fd, VIDIOC_G_FMT, &fmt)< 0)
+    {
+        fprintf(stderr,"VIDIOC_G_FMT set err\n");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("===============%s===============", (unsigned char *) &fmt.fmt.pix.pixelformat);
+
+    printf("==============width: %d, height: %d=============", fmt.fmt.pix.width, fmt.fmt.pix.height);
+
 
     init_mmap(fd);
 }
@@ -181,6 +200,13 @@ int process_image(void *addr, size_t length)
     return 0;
 }
 
+int process_video(void *addr, size_t length) {
+    static int num = 0;
+
+    fwrite(addr, length, 1, video_fp);
+    return 0;
+}
+
 int read_frame(int fd) {
     struct v4l2_buffer buf;
     memset(&buf, 0, sizeof(buf));
@@ -191,7 +217,9 @@ int read_frame(int fd) {
         exit(EXIT_FAILURE);
     }
 
-    process_image(usr_buf[buf.index].start, usr_buf[buf.index].length);
+    process_image(usr_buf[buf.index].start, buf.length);
+    process_video(usr_buf[buf.index].start, buf.length);
+
     if (-1 == ioctl(fd, VIDIOC_QBUF, &buf)) {
         perror("Fail to ioctl `VIDIOC_QBUF");
         exit(EXIT_FAILURE);
@@ -201,7 +229,7 @@ int read_frame(int fd) {
 }
 
 int mainloop(int fd) {
-    int count = 10;
+    int count = 100;
     while (count-- > 0) {
         while(1) {
             fd_set fds;
