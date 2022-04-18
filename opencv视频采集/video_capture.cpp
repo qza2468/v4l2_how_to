@@ -45,12 +45,9 @@ int main() {
          << "height to" << set_size.height << endl;
 
 
-    capture.set(CAP_PROP_FOURCC, VideoWriter::fourcc('M', 'J', 'P', 'G'));
-    cout << capture.get(CAP_PROP_FOURCC) << endl;
 
-    capture.set(CAP_PROP_FRAME_WIDTH, set_size.width);
-    capture.set(CAP_PROP_FRAME_HEIGHT, set_size.height);
-    capture.set(CAP_PROP_FPS, 60);
+
+
 
     actual_size.height = capture.get(CAP_PROP_FRAME_HEIGHT);
     actual_size.width = capture.get(CAP_PROP_FRAME_WIDTH);
